@@ -175,53 +175,58 @@ elif page == "🤖 Neural Forecast":
         chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
         st.line_chart(chart_data)
         
-# --- 7. UPDATED PAGE: QUANT ASSISTANT (VIBE/THINKING ENABLED) ---
+# --- 7. PAGE: QUANT ASSISTANT (STABLE & AUTO-DETECT) ---
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
-    model_id = "gemini-live-2.5-flash-native-audio-preview-12-2025"
 
-    # 2. FIXED CONFIG (Passed as a dict to avoid AttributeError)
-    # The SDK will pass this directly to the API where the field is recognized.
-    vibe_config = {
-        "thinking_config": {
-            "include_thoughts": True,
-            "thinking_budget": 1024 
-        },
-        "temperature": 1.0,
-        "top_p": 0.95
-    }
-
-    if "chat_session" not in st.session_state:
+    # 1. Setup the Model with Auto-Detection
+    if "model_name" not in st.session_state:
         try:
-            # Initialize with the Live model
-            model_gemini = genai.GenerativeModel(model_id)
-            # Start the session
-            st.session_state.chat_session = model_gemini.start_chat(history=[])
-        except Exception as e:
-            st.error(f"Model ID error: {e}")
-            st.stop()
-
-    if prompt := st.chat_input("Analyze the Bitcoin vibe..."):
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        
-        try:
-            # Send message with the dictionary-based generation_config
-            response = st.session_state.chat_session.send_message(
-                prompt, 
-                generation_config=vibe_config
-            )
+            # We look for the first available flash model to avoid 404s
+            available_models = [m.name for m in genai.list_models() 
+                              if 'generateContent' in m.supported_generation_methods]
             
-            with st.chat_message("assistant"):
-                # Use standard part iteration to find the thought summary
-                for part in response.candidates[0].content.parts:
-                    # In the 2.5 API, thoughts are flagged in the 'thought' boolean
-                    if hasattr(part, 'thought') and part.thought:
-                        with st.expander("🧠 Model Thinking Process"):
-                            st.caption(part.text)
-                    elif hasattr(part, 'text'):
-                        st.markdown(part.text)
-                        
+            # Priority: 1.5-flash -> 1.5-flash-latest -> gemini-pro
+            if 'models/gemini-1.5-flash' in available_models:
+                st.session_state.model_name = "models/gemini-1.5-flash"
+            elif 'models/gemini-pro' in available_models:
+                st.session_state.model_name = "models/gemini-pro"
+            else:
+                st.session_state.model_name = available_models[0] # Use whatever is first
+        except Exception:
+            # Fallback if listing fails
+            st.session_state.model_name = "models/gemini-1.5-flash"
+
+    # Initialize the actual model object
+    model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
+
+    # 2. Initialize Chat Session (Mapping to your JS model.startChat)
+    if "chat_session" not in st.session_state:
+        st.session_state.chat_session = model_gemini.start_chat(history=[])
+
+    # 3. Display History (Safe Loop)
+    chat_container = st.container()
+    
+    with chat_container:
+        for message in st.session_state.chat_session.history:
+            role = "user" if message.role == "user" else "assistant"
+            with st.chat_message(role):
+                if message.parts:
+                    st.markdown(message.parts[0].text)
+
+    # 4. Input Area (Mapping to your JS readlineSync)
+    if prompt := st.chat_input("Analyze market volatility..."):
+        # Display the user's message immediately
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
+        
+        # 5. Get AI Response (Mapping to your JS chat.sendMessage)
+        try:
+            response = st.session_state.chat_session.send_message(prompt)
+            with chat_container:
+                with st.chat_message("assistant"):
+                    st.markdown(response.text)
         except Exception as e:
-            st.error(f"API Error: {e}")
-            st.info("Tip: If you get a 'Model Not Found' error, change the model_id to 'gemini-2.5-flash'.")
+            st.error(f"Gemini API Error: {e}")
+            st.info(f"System attempted to use: {st.session_state.model_name}")
