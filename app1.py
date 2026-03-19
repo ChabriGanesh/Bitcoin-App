@@ -178,52 +178,50 @@ elif page == "🤖 Neural Forecast":
 # --- 7. UPDATED PAGE: QUANT ASSISTANT (VIBE/THINKING ENABLED) ---
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
-    model_id = "gemini-2.5-flash-preview-09-2025"
+    model_id = "gemini-live-2.5-flash-native-audio-preview-12-2025"
 
-    # 2. LEGACY CONFIGURATION (The fix for your AttributeError)
-    # Instead of genai.types, we use a standard dictionary for the generation_config
+    # 2. FIXED CONFIG (Passed as a dict to avoid AttributeError)
+    # The SDK will pass this directly to the API where the field is recognized.
     vibe_config = {
         "thinking_config": {
             "include_thoughts": True,
             "thinking_budget": 1024 
         },
-        "temperature": 1.0
+        "temperature": 1.0,
+        "top_p": 0.95
     }
 
-    # 3. Initialization Logic
     if "chat_session" not in st.session_state:
         try:
+            # Initialize with the Live model
             model_gemini = genai.GenerativeModel(model_id)
-            # Start chat using the dictionary-based config
+            # Start the session
             st.session_state.chat_session = model_gemini.start_chat(history=[])
-            st.success("Vibe mode active!")
         except Exception as e:
-            st.error(f"Failed to load 2.5 Flash: {e}")
-            st.info("Falling back to standard Gemini 1.5 Pro...")
-            model_gemini = genai.GenerativeModel("gemini-1.5-pro")
-            st.session_state.chat_session = model_gemini.start_chat(history=[])
+            st.error(f"Model ID error: {e}")
+            st.stop()
 
-    # 4. Input & Response
-    if prompt := st.chat_input("Analyze the current Bitcoin vibe..."):
+    if prompt := st.chat_input("Analyze the Bitcoin vibe..."):
         with st.chat_message("user"):
             st.markdown(prompt)
         
         try:
-            # Pass the configuration directly into the send_message call
+            # Send message with the dictionary-based generation_config
             response = st.session_state.chat_session.send_message(
                 prompt, 
                 generation_config=vibe_config
             )
             
             with st.chat_message("assistant"):
-                # Handle the thinking process parts
-                if hasattr(response.candidates[0], 'content'):
-                    for part in response.candidates[0].content.parts:
-                        # Check for the thought attribute (Beta feature)
-                        if hasattr(part, 'thought') and part.thought:
-                            with st.expander("🧠 Model Thinking Process"):
-                                st.caption(part.text)
-                        elif hasattr(part, 'text'):
-                            st.markdown(part.text)
+                # Use standard part iteration to find the thought summary
+                for part in response.candidates[0].content.parts:
+                    # In the 2.5 API, thoughts are flagged in the 'thought' boolean
+                    if hasattr(part, 'thought') and part.thought:
+                        with st.expander("🧠 Model Thinking Process"):
+                            st.caption(part.text)
+                    elif hasattr(part, 'text'):
+                        st.markdown(part.text)
+                        
         except Exception as e:
             st.error(f"API Error: {e}")
+            st.info("Tip: If you get a 'Model Not Found' error, change the model_id to 'gemini-2.5-flash'.")
