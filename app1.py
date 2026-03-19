@@ -70,7 +70,7 @@ def check_auth():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.image("https://cdn-icons-png.flaticon.com/512/2091/2091665.png", width=80)
-            st.title("AlphaTerminal Login")
+            st.title("Market Lens Login")
             with st.form("Login"):
                 u = st.text_input("Operator ID")
                 p = st.text_input("Access Key", type="password")
