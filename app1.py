@@ -178,47 +178,52 @@ elif page == "🤖 Neural Forecast":
 # --- 7. UPDATED PAGE: QUANT ASSISTANT (VIBE/THINKING ENABLED) ---
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
+model_id = "gemini-2.5-flash-preview-09-2025"
 
-    # 1. Update the Model ID to the Live Preview 09-2025 version
-    # Note: Use this exact string for the 'Vibe' beta features
-    model_id = "gemini-live-2.5-flash-native-audio-preview-09-2025"
+    # 2. LEGACY CONFIGURATION (The fix for your AttributeError)
+    # Instead of genai.types, we use a standard dictionary for the generation_config
+    vibe_config = {
+        "thinking_config": {
+            "include_thoughts": True,
+            "thinking_budget": 1024 
+        },
+        "temperature": 1.0
+    }
 
-    # 2. Modify the Config to enable Thinking/Vibe mode
-    # For 2.5 models, thinking_budget is the key parameter
-    vibe_config = genai.types.GenerateContentConfig(
-        thinking_config=genai.types.ThinkingConfig(
-            include_thoughts=True, # Allows you to see the "vibe check"
-            thinking_budget=1024   # Tokens allocated for reasoning
-        ),
-        temperature=1.0 # High temperature is recommended for 'vibe' interactions
-    )
-
-    # 3. Initialization Logic (Modified to use your existing pattern)
+    # 3. Initialization Logic
     if "chat_session" not in st.session_state:
-        # Initializing the model with the live-preview ID
-        model_gemini = genai.GenerativeModel(model_id)
-        # Applying the vibe_config during the session start
-        st.session_state.chat_session = model_gemini.start_chat(history=[])
+        try:
+            model_gemini = genai.GenerativeModel(model_id)
+            # Start chat using the dictionary-based config
+            st.session_state.chat_session = model_gemini.start_chat(history=[])
+            st.success("Vibe mode active!")
+        except Exception as e:
+            st.error(f"Failed to load 2.5 Flash: {e}")
+            st.info("Falling back to standard Gemini 1.5 Pro...")
+            model_gemini = genai.GenerativeModel("gemini-1.5-pro")
+            st.session_state.chat_session = model_gemini.start_chat(history=[])
 
-    # 4. Display & Interaction (Same as your working code)
-    if prompt := st.chat_input("What's the market vibe today?"):
+    # 4. Input & Response
+    if prompt := st.chat_input("Analyze the current Bitcoin vibe..."):
         with st.chat_message("user"):
             st.markdown(prompt)
         
         try:
-            # We pass the vibe_config directly into the send_message call
+            # Pass the configuration directly into the send_message call
             response = st.session_state.chat_session.send_message(
                 prompt, 
-                config=vibe_config
+                generation_config=vibe_config
             )
             
             with st.chat_message("assistant"):
-                # Check for and display the model's "Thoughts" if available
-                for part in response.candidates[0].content.parts:
-                    if part.thought:
-                        with st.expander("🧠 Model Thinking Process"):
-                            st.caption(part.text)
-                    if part.text:
-                        st.markdown(part.text)
+                # Handle the thinking process parts
+                if hasattr(response.candidates[0], 'content'):
+                    for part in response.candidates[0].content.parts:
+                        # Check for the thought attribute (Beta feature)
+                        if hasattr(part, 'thought') and part.thought:
+                            with st.expander("🧠 Model Thinking Process"):
+                                st.caption(part.text)
+                        elif hasattr(part, 'text'):
+                            st.markdown(part.text)
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"API Error: {e}")
