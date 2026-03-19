@@ -200,7 +200,7 @@ elif page == "💬 Quant Assistant":
                 st.session_state.model_name = available_models[0] # Use whatever is first
         except Exception:
             # Fallback if listing fails
-            st.session_state.model_name = "models/gemini-1.5-flash"
+            st.session_state.model_name = "models/gemini-2.5-flash"
 
     # Initialize the actual model object
     model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
