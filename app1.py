@@ -180,36 +180,41 @@ elif page == "🤖 Neural Forecast":
         chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
         st.line_chart(chart_data)
 
-# --- 7. PAGE: QUANT ASSISTANT (STABLE & AUTO-DETECT) ---
+# --- 7. PAGE: QUANT ASSISTANT (STABLE 2026) ---
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
 
-    # 1. Setup the Model with Auto-Detection
+    # 1. Setup the Model with 2026 Priorities
     if "model_name" not in st.session_state:
         try:
-            # We look for the first available flash model to avoid 404s
+            # We look for the most modern models first
             available_models = [m.name for m in genai.list_models() 
                               if 'generateContent' in m.supported_generation_methods]
             
-            # Priority: 1.5-flash -> 1.5-flash-latest -> gemini-pro
-            if 'models/gemini-1.5-flash' in available_models:
+            # Priorities for 2026: 2.5-flash is the sweet spot for performance
+            if 'models/gemini-2.5-flash' in available_models:
+                st.session_state.model_name = "models/gemini-2.5-flash"
+            elif 'models/gemini-1.5-flash' in available_models:
                 st.session_state.model_name = "models/gemini-1.5-flash"
-            elif 'models/gemini-pro' in available_models:
-                st.session_state.model_name = "models/gemini-pro"
             else:
-                st.session_state.model_name = available_models[0] # Use whatever is first
+                # Fallback to whatever your key is allowed to use
+                st.session_state.model_name = available_models[0]
         except Exception:
-            # Fallback if listing fails
-            st.session_state.model_name = "models/gemini-2.5-flash"
+            # Hard fallback if list_models() fails
+            st.session_state.model_name = "gemini-2.5-flash"
 
-    # Initialize the actual model object
+    # Initialize the model
     model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
 
-    # 2. Initialize Chat Session (Mapping to your JS model.startChat)
+    # 2. Session Initialization & Reset Button
+    if st.sidebar.button("🗑️ Clear Chat History"):
+        st.session_state.chat_session = model_gemini.start_chat(history=[])
+        st.rerun()
+
     if "chat_session" not in st.session_state:
         st.session_state.chat_session = model_gemini.start_chat(history=[])
 
-    # 3. Display History (Safe Loop)
+    # 3. Display History
     chat_container = st.container()
     
     with chat_container:
@@ -219,19 +224,23 @@ elif page == "💬 Quant Assistant":
                 if message.parts:
                     st.markdown(message.parts[0].text)
 
-    # 4. Input Area (Mapping to your JS readlineSync)
+    # 4. Input Area
     if prompt := st.chat_input("Analyze market volatility..."):
         # Display the user's message immediately
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
         
-        # 5. Get AI Response (Mapping to your JS chat.sendMessage)
+        # 5. Get AI Response
         try:
             response = st.session_state.chat_session.send_message(prompt)
             with chat_container:
                 with st.chat_message("assistant"):
                     st.markdown(response.text)
         except Exception as e:
+            # Detailed error handling if the model name is the issue
             st.error(f"Gemini API Error: {e}")
-            st.info(f"System attempted to use: {st.session_state.model_name}")
+            if "404" in str(e):
+                st.warning(f"The model '{st.session_state.model_name}' might be deprecated. Try clearing cache.")
+                # Force reset model selection on next run
+                del st.session_state.model_name
