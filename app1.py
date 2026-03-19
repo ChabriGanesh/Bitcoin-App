@@ -8,7 +8,7 @@ from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
 import os
 # Configure Gemini - Replace with your actual key string
-genai.configure(api_key="AIzaSyB3SvOyl5euzL3KD-_J81Sv-81cZ5Qf2O0")
+genai.configure(api_key=st.secrets["GEMINI_KEY"])
 # --- 1. CONFIGURATION & STYLING ---
 st.set_page_config(
     page_title="Bitcoin Trading App", 
