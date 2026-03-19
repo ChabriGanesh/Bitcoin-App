@@ -178,7 +178,7 @@ elif page == "🤖 Neural Forecast":
 # --- 7. UPDATED PAGE: QUANT ASSISTANT (VIBE/THINKING ENABLED) ---
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
-model_id = "gemini-2.5-flash-preview-09-2025"
+    model_id = "gemini-2.5-flash-preview-09-2025"
 
     # 2. LEGACY CONFIGURATION (The fix for your AttributeError)
     # Instead of genai.types, we use a standard dictionary for the generation_config
