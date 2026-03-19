@@ -155,6 +155,7 @@ if page == "📈 Market Terminal":
 # --- 6. PAGE: NEURAL FORECAST ---
 elif page == "🤖 Neural Forecast":
     st.title("Neural Network Analysis")
+    st.subheader("Where Markets Meet Predictions")
     col_l, col_r = st.columns([1, 2])
     
     with col_l:
