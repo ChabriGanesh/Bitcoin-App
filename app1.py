@@ -184,26 +184,24 @@ elif page == "🤖 Neural Forecast":
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
 
-    # 1. Setup the Model with 2026 Priorities
+    # 1. Setup with 2026 Active Models
     if "model_name" not in st.session_state:
         try:
-            # We look for the most modern models first
             available_models = [m.name for m in genai.list_models() 
                               if 'generateContent' in m.supported_generation_methods]
             
-            # Priorities for 2026: 2.5-flash is the sweet spot for performance
-            if 'models/gemini-2.5-flash' in available_models:
+            # Priority: 3.1 Flash-Lite (Fastest) -> 2.5 Flash (Stable) -> Fallback
+            if 'models/gemini-3.1-flash-lite-preview' in available_models:
+                st.session_state.model_name = "models/gemini-3.1-flash-lite-preview"
+            elif 'models/gemini-2.5-flash' in available_models:
                 st.session_state.model_name = "models/gemini-2.5-flash"
-            elif 'models/gemini-pro' in available_models:
-                st.session_state.model_name = "models/gemini-pro"
             else:
-                # Fallback to whatever your key is allowed to use
                 st.session_state.model_name = available_models[0]
         except Exception:
-            # Hard fallback if list_models() fails
+            # Hardcoded fallback if the API call fails
             st.session_state.model_name = "gemini-2.5-flash"
 
-    # Initialize the model
+    # Initialize the model object
     model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
 
     # 2. Session Initialization & Reset Button
