@@ -184,28 +184,35 @@ elif page == "🤖 Neural Forecast":
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence (Pro)")
 
+    # 🚨 CRITICAL: HARD RESET FOR DEPRECATED MODELS
+    # If the session still remembers a retired model, delete it immediately.
+    if "model_name" in st.session_state and "1.5" in st.session_state.model_name:
+        del st.session_state.model_name
+        st.rerun()
+
     # 1. Setup with 2026 Pro Models
     if "model_name" not in st.session_state:
         try:
+            # Check what models your API key actually supports
             available_models = [m.name for m in genai.list_models() 
                               if 'generateContent' in m.supported_generation_methods]
             
-            # 2026 Pro Priority: 3.1 Pro (Latest) -> 2.5 Pro (Stable)
+            # 2026 Priority: Gemini 3.1 Pro is the flagship
             if 'models/gemini-3.1-pro-preview' in available_models:
                 st.session_state.model_name = "models/gemini-3.1-pro-preview"
             elif 'models/gemini-2.5-pro' in available_models:
                 st.session_state.model_name = "models/gemini-2.5-pro"
             else:
-                # If neither Pro is found, it will use your first available model
+                # Fallback to the first available Pro/Flash model in the list
                 st.session_state.model_name = available_models[0]
         except Exception:
-            # Emergency hardcoded fallback for the current Pro model
-            st.session_state.model_name = "gemini-3.1-pro-preview"
+            # Emergency manual fallback string for 2026
+            st.session_state.model_name = "models/gemini-3.1-pro-preview"
 
-    # Initialize the model object
+    # Initialize the model
     model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
 
-    # 2. Reset Button (Important to clear that stuck 404 string)
+    # 2. Reset Button
     if st.sidebar.button("🗑️ Reset Pro Session"):
         for key in ["chat_session", "model_name"]:
             if key in st.session_state:
@@ -224,8 +231,8 @@ elif page == "💬 Quant Assistant":
                 if message.parts:
                     st.markdown(message.parts[0].text)
 
-    # 4. Input & Error Handling
-    if prompt := st.chat_input("Analyze market volatility..."):
+    # 4. Input handling
+    if prompt := st.chat_input("Ask about Bitcoin trends..."):
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
@@ -236,10 +243,9 @@ elif page == "💬 Quant Assistant":
                 with st.chat_message("assistant"):
                     st.markdown(response.text)
         except Exception as e:
-            st.error(f"Gemini API Error: {e}")
-            # AUTO-RECOVERY: If the model is not found, clear the session state
-            if "404" in str(e) or "not found" in str(e).lower():
-                st.warning("Detected a retired model. Resetting session...")
-                if "model_name" in st.session_state:
-                    del st.session_state.model_name
-                st.button("Click to Refresh Model Connection", on_click=st.rerun)
+            # If the error persists, show the EXACT model name that failed
+            st.error(f"Error with {st.session_state.model_name}: {e}")
+            if "404" in str(e):
+                st.warning("Force-resetting model name...")
+                del st.session_state.model_name
+                st.button("Reconnect", on_click=st.rerun)
