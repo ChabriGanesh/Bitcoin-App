@@ -180,35 +180,33 @@ elif page == "🤖 Neural Forecast":
         chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
         st.line_chart(chart_data)
 
-# --- 7. PAGE: QUANT ASSISTANT (STABLE 2026) ---
+# --- 7. PAGE: QUANT ASSISTANT (PRO ONLY - 2026) ---
 elif page == "💬 Quant Assistant":
-    st.title("💬 Gemini Quant Intelligence")
+    st.title("💬 Gemini Quant Intelligence (Pro)")
 
-    # 1. Setup with 2026 Active Models
+    # 1. Setup with 2026 Pro Models
     if "model_name" not in st.session_state:
         try:
-            # Dynamically fetch available models to avoid hardcoded 404s
             available_models = [m.name for m in genai.list_models() 
                               if 'generateContent' in m.supported_generation_methods]
             
-            # 2026 Priority Logic
-            if 'models/gemini-3.1-flash-lite-preview' in available_models:
-                st.session_state.model_name = "models/gemini-3.1-flash-lite-preview"
-            elif 'models/gemini-3-flash-preview' in available_models:
-                st.session_state.model_name = "models/gemini-3-flash-preview"
-            elif 'models/gemini-2.5-flash' in available_models:
-                st.session_state.model_name = "models/gemini-2.5-flash"
+            # 2026 Pro Priority: 3.1 Pro (Latest) -> 2.5 Pro (Stable)
+            if 'models/gemini-3.1-pro-preview' in available_models:
+                st.session_state.model_name = "models/gemini-3.1-pro-preview"
+            elif 'models/gemini-2.5-pro' in available_models:
+                st.session_state.model_name = "models/gemini-2.5-pro"
             else:
+                # If neither Pro is found, it will use your first available model
                 st.session_state.model_name = available_models[0]
         except Exception:
-            # Emergency hardcoded fallback
-            st.session_state.model_name = "gemini-3.1-flash-lite-preview"
+            # Emergency hardcoded fallback for the current Pro model
+            st.session_state.model_name = "gemini-3.1-pro-preview"
 
     # Initialize the model object
     model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
 
-    # 2. Reset Logic (Clears both history AND the stuck model name)
-    if st.sidebar.button("🗑️ Reset Assistant"):
+    # 2. Reset Button (Important to clear that stuck 404 string)
+    if st.sidebar.button("🗑️ Reset Pro Session"):
         for key in ["chat_session", "model_name"]:
             if key in st.session_state:
                 del st.session_state[key]
