@@ -174,59 +174,51 @@ elif page == "🤖 Neural Forecast":
         st.caption("Historical Accuracy vs Prediction")
         chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
         st.line_chart(chart_data)
-
-# --- 7. PAGE: QUANT ASSISTANT (STABLE & AUTO-DETECT) ---
+        
+# --- 7. UPDATED PAGE: QUANT ASSISTANT (VIBE/THINKING ENABLED) ---
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
 
-    # 1. Setup the Model with Auto-Detection
-    if "model_name" not in st.session_state:
-        try:
-            # We look for the first available flash model to avoid 404s
-            available_models = [m.name for m in genai.list_models() 
-                              if 'generateContent' in m.supported_generation_methods]
-            
-            # Priority: 1.5-flash -> 1.5-flash-latest -> gemini-pro
-            if 'models/gemini-1.5-flash' in available_models:
-                st.session_state.model_name = "models/gemini-2.5-flash-live-preview"
-            elif 'models/gemini-pro' in available_models:
-                st.session_state.model_name = "models/gemini-pro"
-            else:
-                st.session_state.model_name = available_models[0] # Use whatever is first
-        except Exception:
-            # Fallback if listing fails
-            st.session_state.model_name = "models/gemini-2.5-flash-live-preview"
+    # 1. Update the Model ID to the Live Preview 09-2025 version
+    # Note: Use this exact string for the 'Vibe' beta features
+    model_id = "gemini-live-2.5-flash-native-audio-preview-09-2025"
 
-    # Initialize the actual model object
-    model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
+    # 2. Modify the Config to enable Thinking/Vibe mode
+    # For 2.5 models, thinking_budget is the key parameter
+    vibe_config = genai.types.GenerateContentConfig(
+        thinking_config=genai.types.ThinkingConfig(
+            include_thoughts=True, # Allows you to see the "vibe check"
+            thinking_budget=1024   # Tokens allocated for reasoning
+        ),
+        temperature=1.0 # High temperature is recommended for 'vibe' interactions
+    )
 
-    # 2. Initialize Chat Session (Mapping to your JS model.startChat)
+    # 3. Initialization Logic (Modified to use your existing pattern)
     if "chat_session" not in st.session_state:
+        # Initializing the model with the live-preview ID
+        model_gemini = genai.GenerativeModel(model_id)
+        # Applying the vibe_config during the session start
         st.session_state.chat_session = model_gemini.start_chat(history=[])
 
-    # 3. Display History (Safe Loop)
-    chat_container = st.container()
-    
-    with chat_container:
-        for message in st.session_state.chat_session.history:
-            role = "user" if message.role == "user" else "assistant"
-            with st.chat_message(role):
-                if message.parts:
-                    st.markdown(message.parts[0].text)
-
-    # 4. Input Area (Mapping to your JS readlineSync)
-    if prompt := st.chat_input("Analyze market volatility..."):
-        # Display the user's message immediately
-        with chat_container:
-            with st.chat_message("user"):
-                st.markdown(prompt)
+    # 4. Display & Interaction (Same as your working code)
+    if prompt := st.chat_input("What's the market vibe today?"):
+        with st.chat_message("user"):
+            st.markdown(prompt)
         
-        # 5. Get AI Response (Mapping to your JS chat.sendMessage)
         try:
-            response = st.session_state.chat_session.send_message(prompt)
-            with chat_container:
-                with st.chat_message("assistant"):
-                    st.markdown(response.text)
+            # We pass the vibe_config directly into the send_message call
+            response = st.session_state.chat_session.send_message(
+                prompt, 
+                config=vibe_config
+            )
+            
+            with st.chat_message("assistant"):
+                # Check for and display the model's "Thoughts" if available
+                for part in response.candidates[0].content.parts:
+                    if part.thought:
+                        with st.expander("🧠 Model Thinking Process"):
+                            st.caption(part.text)
+                    if part.text:
+                        st.markdown(part.text)
         except Exception as e:
-            st.error(f"Gemini API Error: {e}")
-            st.info(f"System attempted to use: {st.session_state.model_name}")
+            st.error(f"Error: {e}")
