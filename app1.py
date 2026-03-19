@@ -8,12 +8,7 @@ from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
 import os
 # Configure Gemini - Replace with your actual key string
-# Replace your old genai.configure line with this:
-if "GEMINI_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_KEY"])
-else:
-    # Fallback for local testing if you don't use secrets.toml
-    genai.configure(api_key="AIzaSyB3SvOyl5euzL3KD-_J81Sv-81cZ5Qf2O0")
+genai.configure(api_key="AIzaSyB3SvOyl5euzL3KD-_J81Sv-81cZ5Qf2O0")
 # --- 1. CONFIGURATION & STYLING ---
 st.set_page_config(
     page_title="Bitcoin Trading App", 
@@ -180,33 +175,38 @@ elif page == "🤖 Neural Forecast":
         chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
         st.line_chart(chart_data)
 
-# --- 7. PAGE: QUANT ASSISTANT (STABLE 2026) ---
+# --- 7. PAGE: QUANT ASSISTANT (STABLE & AUTO-DETECT) ---
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
 
-    # 1. Setup - Using the working "Pro" configuration
-    # We use a static name here to avoid the 404 from the old '1.5-flash'
-    try:
-        # In 2026, gemini-3.1-pro-preview is the standard for high-level analysis
-        model_name = "gemini-3.1-pro-preview" 
-        model_gemini = genai.GenerativeModel(model_name)
-    except Exception as e:
-        st.error(f"Initialization Error: {e}")
-        st.stop()
+    # 1. Setup the Model with Auto-Detection
+    if "model_name" not in st.session_state:
+        try:
+            # We look for the first available flash model to avoid 404s
+            available_models = [m.name for m in genai.list_models() 
+                              if 'generateContent' in m.supported_generation_methods]
+            
+            # Priority: 1.5-flash -> 1.5-flash-latest -> gemini-pro
+            if 'models/gemini-1.5-flash' in available_models:
+                st.session_state.model_name = "models/gemini-1.5-flash"
+            elif 'models/gemini-pro' in available_models:
+                st.session_state.model_name = "models/gemini-pro"
+            else:
+                st.session_state.model_name = available_models[0] # Use whatever is first
+        except Exception:
+            # Fallback if listing fails
+            st.session_state.model_name = "models/gemini-1.5-flash"
 
-    # 2. Session Initialization & Reset Button
-    # Adding this sidebar button is critical to clear the "stuck" 404 error
-    if st.sidebar.button("🗑️ Reset Chat Session"):
-        if "chat_session" in st.session_state:
-            del st.session_state.chat_session
-        st.rerun()
+    # Initialize the actual model object
+    model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
 
+    # 2. Initialize Chat Session (Mapping to your JS model.startChat)
     if "chat_session" not in st.session_state:
-        # start_chat(history=[]) is exactly what worked in your early version
         st.session_state.chat_session = model_gemini.start_chat(history=[])
 
-    # 3. Display History
+    # 3. Display History (Safe Loop)
     chat_container = st.container()
+    
     with chat_container:
         for message in st.session_state.chat_session.history:
             role = "user" if message.role == "user" else "assistant"
@@ -214,22 +214,19 @@ elif page == "💬 Quant Assistant":
                 if message.parts:
                     st.markdown(message.parts[0].text)
 
-    # 4. Input & Response logic
+    # 4. Input Area (Mapping to your JS readlineSync)
     if prompt := st.chat_input("Analyze market volatility..."):
+        # Display the user's message immediately
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
         
+        # 5. Get AI Response (Mapping to your JS chat.sendMessage)
         try:
-            # send_message(prompt) is the direct call that worked for you
             response = st.session_state.chat_session.send_message(prompt)
             with chat_container:
                 with st.chat_message("assistant"):
                     st.markdown(response.text)
         except Exception as e:
             st.error(f"Gemini API Error: {e}")
-            if "404" in str(e):
-                st.info("The server is rejecting the old model. Please click 'Reset Chat Session' in the sidebar.")
-                st.warning("Force-resetting model name...")
-                del st.session_state.model_name
-                st.button("Reconnect", on_click=st.rerun)
+            st.info(f"System attempted to use: {st.session_state.model_name}")
