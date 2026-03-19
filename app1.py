@@ -187,26 +187,36 @@ elif page == "💬 Quant Assistant":
     # 1. Setup with 2026 Active Models
     if "model_name" not in st.session_state:
         try:
+            # Dynamically fetch available models to avoid hardcoded 404s
             available_models = [m.name for m in genai.list_models() 
                               if 'generateContent' in m.supported_generation_methods]
             
-            # Priority: 3.1 Flash-Lite (Fastest) -> 2.5 Flash (Stable) -> Fallback
+            # 2026 Priority Logic:
+            # 1. 3.1 Flash-Lite (Fast/Efficient) 
+            # 2. 3.0 Flash (Standard)
+            # 3. 2.5 Flash (Legacy Stable - Shutdown June 2026)
             if 'models/gemini-3.1-flash-lite-preview' in available_models:
                 st.session_state.model_name = "models/gemini-3.1-flash-lite-preview"
+            elif 'models/gemini-3-flash-preview' in available_models:
+                st.session_state.model_name = "models/gemini-3-flash-preview"
             elif 'models/gemini-2.5-flash' in available_models:
                 st.session_state.model_name = "models/gemini-2.5-flash"
             else:
                 st.session_state.model_name = available_models[0]
         except Exception:
-            # Hardcoded fallback if the API call fails
-            st.session_state.model_name = "gemini-2.5-flash"
+            # Emergency hardcoded fallback for 2026
+            st.session_state.model_name = "gemini-3.1-flash-lite-preview"
 
     # Initialize the model object
     model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
 
     # 2. Session Initialization & Reset Button
     if st.sidebar.button("🗑️ Clear Chat History"):
-        st.session_state.chat_session = model_gemini.start_chat(history=[])
+        # We also clear model_name here to force a fresh check of the API
+        keys_to_clear = ["chat_session", "model_name"]
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
         st.rerun()
 
     if "chat_session" not in st.session_state:
@@ -214,7 +224,6 @@ elif page == "💬 Quant Assistant":
 
     # 3. Display History
     chat_container = st.container()
-    
     with chat_container:
         for message in st.session_state.chat_session.history:
             role = "user" if message.role == "user" else "assistant"
@@ -222,23 +231,22 @@ elif page == "💬 Quant Assistant":
                 if message.parts:
                     st.markdown(message.parts[0].text)
 
-    # 4. Input Area
+    # 4. Input Area & Error Handling
     if prompt := st.chat_input("Analyze market volatility..."):
-        # Display the user's message immediately
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
         
-        # 5. Get AI Response
         try:
             response = st.session_state.chat_session.send_message(prompt)
             with chat_container:
                 with st.chat_message("assistant"):
                     st.markdown(response.text)
         except Exception as e:
-            # Detailed error handling if the model name is the issue
             st.error(f"Gemini API Error: {e}")
-            if "404" in str(e):
-                st.warning(f"The model '{st.session_state.model_name}' might be deprecated. Try clearing cache.")
-                # Force reset model selection on next run
-                del st.session_state.model_name
+            # If a 404 occurs mid-session, it means a model was just retired
+            if "404" in str(e) or "not found" in str(e).lower():
+                st.warning("Model deprecation detected. Resetting session...")
+                if "model_name" in st.session_state:
+                    del st.session_state.model_name
+                st.button("Refresh Model Connection", on_click=st.rerun)
