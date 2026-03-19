@@ -180,49 +180,32 @@ elif page == "🤖 Neural Forecast":
         chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
         st.line_chart(chart_data)
 
-# --- 7. PAGE: QUANT ASSISTANT (PRO ONLY - 2026) ---
+# --- 7. PAGE: QUANT ASSISTANT (STABLE 2026) ---
 elif page == "💬 Quant Assistant":
-    st.title("💬 Gemini Quant Intelligence (Pro)")
+    st.title("💬 Gemini Quant Intelligence")
 
-    # 🚨 CRITICAL: HARD RESET FOR DEPRECATED MODELS
-    # If the session still remembers a retired model, delete it immediately.
-    if "model_name" in st.session_state and "1.5" in st.session_state.model_name:
-        del st.session_state.model_name
-        st.rerun()
+    # 1. Setup - Using the working "Pro" configuration
+    # We use a static name here to avoid the 404 from the old '1.5-flash'
+    try:
+        # In 2026, gemini-3.1-pro-preview is the standard for high-level analysis
+        model_name = "gemini-3.1-pro-preview" 
+        model_gemini = genai.GenerativeModel(model_name)
+    except Exception as e:
+        st.error(f"Initialization Error: {e}")
+        st.stop()
 
-    # 1. Setup with 2026 Pro Models
-    if "model_name" not in st.session_state:
-        try:
-            # Check what models your API key actually supports
-            available_models = [m.name for m in genai.list_models() 
-                              if 'generateContent' in m.supported_generation_methods]
-            
-            # 2026 Priority: Gemini 3.1 Pro is the flagship
-            if 'models/gemini-3.1-pro-preview' in available_models:
-                st.session_state.model_name = "models/gemini-3.1-pro-preview"
-            elif 'models/gemini-2.5-pro' in available_models:
-                st.session_state.model_name = "models/gemini-2.5-pro"
-            else:
-                # Fallback to the first available Pro/Flash model in the list
-                st.session_state.model_name = available_models[0]
-        except Exception:
-            # Emergency manual fallback string for 2026
-            st.session_state.model_name = "models/gemini-3.1-pro-preview"
-
-    # Initialize the model
-    model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
-
-    # 2. Reset Button
-    if st.sidebar.button("🗑️ Reset Pro Session"):
-        for key in ["chat_session", "model_name"]:
-            if key in st.session_state:
-                del st.session_state[key]
+    # 2. Session Initialization & Reset Button
+    # Adding this sidebar button is critical to clear the "stuck" 404 error
+    if st.sidebar.button("🗑️ Reset Chat Session"):
+        if "chat_session" in st.session_state:
+            del st.session_state.chat_session
         st.rerun()
 
     if "chat_session" not in st.session_state:
+        # start_chat(history=[]) is exactly what worked in your early version
         st.session_state.chat_session = model_gemini.start_chat(history=[])
 
-    # 3. Chat Interface
+    # 3. Display History
     chat_container = st.container()
     with chat_container:
         for message in st.session_state.chat_session.history:
@@ -231,21 +214,22 @@ elif page == "💬 Quant Assistant":
                 if message.parts:
                     st.markdown(message.parts[0].text)
 
-    # 4. Input handling
-    if prompt := st.chat_input("Ask about Bitcoin trends..."):
+    # 4. Input & Response logic
+    if prompt := st.chat_input("Analyze market volatility..."):
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
         
         try:
+            # send_message(prompt) is the direct call that worked for you
             response = st.session_state.chat_session.send_message(prompt)
             with chat_container:
                 with st.chat_message("assistant"):
                     st.markdown(response.text)
         except Exception as e:
-            # If the error persists, show the EXACT model name that failed
-            st.error(f"Error with {st.session_state.model_name}: {e}")
+            st.error(f"Gemini API Error: {e}")
             if "404" in str(e):
+                st.info("The server is rejecting the old model. Please click 'Reset Chat Session' in the sidebar.")
                 st.warning("Force-resetting model name...")
                 del st.session_state.model_name
                 st.button("Reconnect", on_click=st.rerun)
