@@ -194,8 +194,8 @@ elif page == "💬 Quant Assistant":
             # Priorities for 2026: 2.5-flash is the sweet spot for performance
             if 'models/gemini-2.5-flash' in available_models:
                 st.session_state.model_name = "models/gemini-2.5-flash"
-            elif 'models/gemini-1.5-flash' in available_models:
-                st.session_state.model_name = "models/gemini-1.5-flash"
+            elif 'models/gemini-pro' in available_models:
+                st.session_state.model_name = "models/gemini-pro"
             else:
                 # Fallback to whatever your key is allowed to use
                 st.session_state.model_name = available_models[0]
