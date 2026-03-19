@@ -188,14 +188,14 @@ elif page == "💬 Quant Assistant":
             
             # Priority: 1.5-flash -> 1.5-flash-latest -> gemini-pro
             if 'models/gemini-1.5-flash' in available_models:
-                st.session_state.model_name = "models/gemini-1.5-flash"
+                st.session_state.model_name = "models/gemini-1.5-pro"
             elif 'models/gemini-pro' in available_models:
                 st.session_state.model_name = "models/gemini-pro"
             else:
                 st.session_state.model_name = available_models[0] # Use whatever is first
         except Exception:
             # Fallback if listing fails
-            st.session_state.model_name = "models/gemini-1.5-flash"
+            st.session_state.model_name = "models/gemini-1.5-pro"
 
     # Initialize the actual model object
     model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
