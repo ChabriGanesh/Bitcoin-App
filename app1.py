@@ -180,50 +180,38 @@ elif page == "🤖 Neural Forecast":
         chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
         st.line_chart(chart_data)
 
-# --- 7. PAGE: QUANT ASSISTANT (STABLE 2026) ---
+# --- 7. PAGE: QUANT ASSISTANT (STABLE & AUTO-DETECT) ---
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
 
-    # 1. Setup with 2026 Active Models
+    # 1. Setup the Model with Auto-Detection
     if "model_name" not in st.session_state:
         try:
-            # Dynamically fetch available models to avoid hardcoded 404s
+            # We look for the first available flash model to avoid 404s
             available_models = [m.name for m in genai.list_models() 
                               if 'generateContent' in m.supported_generation_methods]
             
-            # 2026 Priority Logic:
-            # 1. 3.1 Flash-Lite (Fast/Efficient) 
-            # 2. 3.0 Flash (Standard)
-            # 3. 2.5 Flash (Legacy Stable - Shutdown June 2026)
-            if 'models/gemini-3.1-flash-lite-preview' in available_models:
-                st.session_state.model_name = "models/gemini-3.1-flash-lite-preview"
-            elif 'models/gemini-3-flash-preview' in available_models:
-                st.session_state.model_name = "models/gemini-3-flash-preview"
-            elif 'models/gemini-2.5-flash' in available_models:
-                st.session_state.model_name = "models/gemini-2.5-flash"
+            # Priority: 1.5-flash -> 1.5-flash-latest -> gemini-pro
+            if 'models/gemini-1.5-flash' in available_models:
+                st.session_state.model_name = "models/gemini-1.5-flash"
+            elif 'models/gemini-pro' in available_models:
+                st.session_state.model_name = "models/gemini-pro"
             else:
-                st.session_state.model_name = available_models[0]
+                st.session_state.model_name = available_models[0] # Use whatever is first
         except Exception:
-            # Emergency hardcoded fallback for 2026
-            st.session_state.model_name = "gemini-3.1-flash-lite-preview"
+            # Fallback if listing fails
+            st.session_state.model_name = "models/gemini-1.5-flash"
 
-    # Initialize the model object
+    # Initialize the actual model object
     model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
 
-    # 2. Session Initialization & Reset Button
-    if st.sidebar.button("🗑️ Clear Chat History"):
-        # We also clear model_name here to force a fresh check of the API
-        keys_to_clear = ["chat_session", "model_name"]
-        for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.rerun()
-
+    # 2. Initialize Chat Session (Mapping to your JS model.startChat)
     if "chat_session" not in st.session_state:
         st.session_state.chat_session = model_gemini.start_chat(history=[])
 
-    # 3. Display History
+    # 3. Display History (Safe Loop)
     chat_container = st.container()
+    
     with chat_container:
         for message in st.session_state.chat_session.history:
             role = "user" if message.role == "user" else "assistant"
@@ -231,12 +219,14 @@ elif page == "💬 Quant Assistant":
                 if message.parts:
                     st.markdown(message.parts[0].text)
 
-    # 4. Input Area & Error Handling
+    # 4. Input Area (Mapping to your JS readlineSync)
     if prompt := st.chat_input("Analyze market volatility..."):
+        # Display the user's message immediately
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
         
+        # 5. Get AI Response (Mapping to your JS chat.sendMessage)
         try:
             response = st.session_state.chat_session.send_message(prompt)
             with chat_container:
@@ -244,9 +234,4 @@ elif page == "💬 Quant Assistant":
                     st.markdown(response.text)
         except Exception as e:
             st.error(f"Gemini API Error: {e}")
-            # If a 404 occurs mid-session, it means a model was just retired
-            if "404" in str(e) or "not found" in str(e).lower():
-                st.warning("Model deprecation detected. Resetting session...")
-                if "model_name" in st.session_state:
-                    del st.session_state.model_name
-                st.button("Refresh Model Connection", on_click=st.rerun)
+            st.info(f"System attempted to use: {st.session_state.model_name}")
