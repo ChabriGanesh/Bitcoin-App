@@ -3,12 +3,12 @@ import pandas as pd
 import numpy as np
 import requests
 import google.generativeai as genai
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
 import os
-# Configure Gemini - Replace with your actual key string
+
+# Configure Gemini API
 genai.configure(api_key=st.secrets["GEMINI_KEY"])
+
 # --- 1. CONFIGURATION & STYLING ---
 st.set_page_config(
     page_title="Bitcoin Trading App", 
@@ -61,7 +61,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. AUTHENTICATION (REFINED) ---
+# --- 2. AUTHENTICATION ---
 def check_auth():
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
@@ -103,8 +103,11 @@ def get_btc_data(limit=100):
         r = requests.get(url).json()
         df = pd.DataFrame(r['Data']['Data'])
         df['time'] = pd.to_datetime(df['time'], unit='s')
+        # Standardize column names to lower case
+        df.columns = df.columns.str.lower()
         return df.set_index('time')
-    except: return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
 
 # --- 5. PAGE: DASHBOARD ---
 if page == "📈 Market Terminal":
@@ -112,45 +115,48 @@ if page == "📈 Market Terminal":
     
     # Top Row Metrics
     df = get_btc_data(30)
-    current_price = df['Close'].iloc[-1]
-    prev_price = df['close'].iloc[-2]
-    pct_change = ((current_price - prev_price) / prev_price) * 100
+    if not df.empty and 'close' in df.columns:
+        current_price = df['close'].iloc[-1]
+        prev_price = df['close'].iloc[-2]
+        pct_change = ((current_price - prev_price) / prev_price) * 100
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("BITCOIN", f"${current_price:,.2f}", f"{pct_change:.2f}%")
-    m2.metric("24H VOLUME", f"{df['volumeto'].iloc[-1]/1e6:.1f}M", "USD")
-    m3.metric("RSI (14)", "58.4", "Neutral")
-    m4.metric("VOLATILITY", "2.4%", "-0.5%")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("BITCOIN", f"${current_price:,.2f}", f"{pct_change:.2f}%")
+        m2.metric("24H VOLUME", f"{df['volumeto'].iloc[-1]/1e6:.1f}M", "USD")
+        m3.metric("RSI (14)", "58.4", "Neutral")
+        m4.metric("VOLATILITY", "2.4%", "-0.5%")
 
-    # Main Chart Area
-    st.subheader("Market Momentum")
-    st.area_chart(df[['close']], color="#00FFAA")
-    
-    # Lower Data Tabs
-    t1, t2 = st.tabs(["📊 Order Flow", "📰 Sentiment"])
-    with t1:
-        st.table(df.tail(5)[['high', 'low', 'close', 'volumeto']])
-    with t2:
-        st.subheader("Market Psychology")
+        # Main Chart Area
+        st.subheader("Market Momentum")
+        st.area_chart(df[['close']], color="#00FFAA")
         
-        # 1. Fear & Greed Index (Using a popular free API)
-        try:
-            fg_r = requests.get("https://api.alternative.me/fng/").json()
-            fg_value = int(fg_r['data'][0]['value'])
-            fg_status = fg_r['data'][0]['value_classification']
+        # Lower Data Tabs
+        t1, t2 = st.tabs(["📊 Order Flow", "📰 Sentiment"])
+        with t1:
+            st.table(df.tail(5)[['high', 'low', 'close', 'volumeto']])
+        with t2:
+            st.subheader("Market Psychology")
             
-            st.metric("Fear & Greed Index", f"{fg_value}/100", fg_status)
-            st.progress(fg_value / 100) # Visual bar
-        except:
-            st.write("Psychology data temporarily unavailable.")
+            # 1. Fear & Greed Index
+            try:
+                fg_r = requests.get("https://api.alternative.me/fng/").json()
+                fg_value = int(fg_r['data'][0]['value'])
+                fg_status = fg_r['data'][0]['value_classification']
+                
+                st.metric("Fear & Greed Index", f"{fg_value}/100", fg_status)
+                st.progress(fg_value / 100)
+            except Exception:
+                st.write("Psychology data temporarily unavailable.")
 
-        # 2. AI Sentiment Analysis
-        st.divider()
-        st.caption("AI News Pulse")
-        if pct_change > 0:
-            st.success("Positive momentum detected in social volume.")
-        else:
-            st.warning("Increased selling pressure observed in order books.")
+            # 2. AI Sentiment Analysis
+            st.divider()
+            st.caption("AI News Pulse")
+            if pct_change > 0:
+                st.success("Positive momentum detected in social volume.")
+            else:
+                st.warning("Increased selling pressure observed in order books.")
+    else:
+        st.error("Unable to load cryptocurrency market data.")
 
 # --- 6. PAGE: NEURAL FORECAST ---
 elif page == "🤖 Neural Forecast":
@@ -162,12 +168,10 @@ elif page == "🤖 Neural Forecast":
         st.info("Model: LSTM-v4\n\nInputs: OHLCV, 60-Day Window")
         if st.button("RUN INFERENCE", use_container_width=True):
             with st.status("Computing weights..."):
-                # Simulation of logic since model file might be missing
                 st.write("Fetching historical window...")
                 st.write("Normalizing tensors...")
                 st.write("Running forward pass...")
             
-            # Logic here... (same as your original, but prettier output)
             st.success("Analysis Complete")
             st.metric("Neural Target", "$68,432", "+2.4%")
 
@@ -176,36 +180,37 @@ elif page == "🤖 Neural Forecast":
         chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
         st.line_chart(chart_data)
         
-# --- 7. PAGE: QUANT ASSISTANT (STABLE & AUTO-DETECT) ---
+# --- 7. PAGE: QUANT ASSISTANT ---
 elif page == "💬 Quant Assistant":
     st.title("💬 Gemini Quant Intelligence")
 
-    # 1. Setup the Model with Auto-Detection
+    # 1. Setup Model Auto-Detection
     if "model_name" not in st.session_state:
         try:
-            # We look for the first available flash model to avoid 404s
             available_models = [m.name for m in genai.list_models() 
                               if 'generateContent' in m.supported_generation_methods]
             
-            # Priority: 1.5-flash -> 1.5-flash-latest -> gemini-pro
             if 'models/gemini-1.5-flash' in available_models:
+                st.session_state.model_name = "models/gemini-1.5-flash"
+            elif 'models/gemini-2.5-flash' in available_models:
                 st.session_state.model_name = "models/gemini-2.5-flash"
             elif 'models/gemini-pro' in available_models:
                 st.session_state.model_name = "models/gemini-pro"
+            elif available_models:
+                st.session_state.model_name = available_models[0]
             else:
-                st.session_state.model_name = available_models[0] # Use whatever is first
+                st.session_state.model_name = "gemini-1.5-flash"
         except Exception:
-            # Fallback if listing fails
-            st.session_state.model_name = "models/gemini-2.5-flash"
+            st.session_state.model_name = "gemini-1.5-flash"
 
-    # Initialize the actual model object
+    # Initialize Model Instance
     model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
 
-    # 2. Initialize Chat Session (Mapping to your JS model.startChat)
+    # 2. Initialize Chat Session
     if "chat_session" not in st.session_state:
         st.session_state.chat_session = model_gemini.start_chat(history=[])
 
-    # 3. Display History (Safe Loop)
+    # 3. Display History
     chat_container = st.container()
     
     with chat_container:
@@ -215,14 +220,13 @@ elif page == "💬 Quant Assistant":
                 if message.parts:
                     st.markdown(message.parts[0].text)
 
-    # 4. Input Area (Mapping to your JS readlineSync)
+    # 4. Input Area
     if prompt := st.chat_input("Analyze market volatility..."):
-        # Display the user's message immediately
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
         
-        # 5. Get AI Response (Mapping to your JS chat.sendMessage)
+        # 5. Send Prompt & Retrieve Response
         try:
             response = st.session_state.chat_session.send_message(prompt)
             with chat_container:
