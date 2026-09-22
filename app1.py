@@ -88,14 +88,14 @@ check_auth()
 
 # --- 3. SIDEBAR & TOOLS ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2533/2533030.png", width=50)
-    st.title("ALPHA v2.0")
-    st.divider()
-    page = st.selectbox("MODULE", ["📈 Market Terminal", "🤖 Neural Forecast", "💬 Quant Assistant"])
-    
-    st.sidebar.markdown("---")
-    st.sidebar.caption("System Latency: 24ms")
-    st.sidebar.markdown('<p><span class="status-indicator"></span>Network: Secured</p>', unsafe_allow_html=True)
+    st.image("https://cdn-icons-png.flaticon.com/512/2533/2533030.png", width=50)
+    st.title("ALPHA v2.0")
+    st.divider()
+    page = st.selectbox("MODULE", ["📈 Market Terminal", "🤖 Neural Forecast", "💬 Quant Assistant"])
+    
+    st.sidebar.markdown("---")
+    st.sidebar.caption("System Latency: 24ms")
+    st.sidebar.markdown('<p><span class="status-indicator"></span>Network: Secured</p>', unsafe_allow_html=True)
 
 # --- 4. DATA ENGINES ---
 @st.cache_data(ttl=300)
