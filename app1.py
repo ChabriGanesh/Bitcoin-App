@@ -12,11 +12,12 @@ import os
 genai.configure(api_key=st.secrets["GEMINI_KEY"])
 # --- 1. CONFIGURATION & STYLING ---
 st.set_page_config(
-    page_title="Bitcoin Trading App", 
-    layout="wide", 
-    page_icon="💎",
-    initial_sidebar_state="expanded"
+    page_title="Bitcoin Trading App",
+    layout="wide",
+    page_icon="💎",
+    initial_sidebar_state="expanded"
 )
+
 
 # Professional Dark Theme CSS
 st.markdown("""
