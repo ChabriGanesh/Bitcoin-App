@@ -104,10 +104,14 @@ def get_btc_data(limit=100):
     url = f"https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit={limit}"
     try:
         r = requests.get(url).json()
-        df = pd.DataFrame(r['Data']['Data'])
-        df['time'] = pd.to_datetime(df['time'], unit='s')
-        return df.set_index('time')
-    except: return pd.DataFrame()
+        if 'Data' in r and 'Data' in r['Data']:
+            df = pd.DataFrame(r['Data']['Data'])
+            df['time'] = pd.to_datetime(df['time'], unit='s')
+            df.columns = df.columns.str.lower()  # Force lowercase column names
+            return df.set_index('time')
+        return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
 
 # --- 5. PAGE: DASHBOARD ---
 if page == "📈 Market Terminal":
