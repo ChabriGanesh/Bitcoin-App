@@ -65,24 +65,24 @@ st.markdown("""
 
 # --- 2. AUTHENTICATION (REFINED) ---
 def check_auth():
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
 
-    if not st.session_state.logged_in:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.image("https://cdn-icons-png.flaticon.com/512/2091/2091665.png", width=80)
-            st.title("Market Lens Login")
-            with st.form("Login"):
-                u = st.text_input("Operator ID")
-                p = st.text_input("Access Key", type="password")
-                if st.form_submit_button("INITIALIZE SESSION"):
-                    if u == "admin" and p == "mypass123":
-                        st.session_state.logged_in = True
-                        st.rerun()
-                    else:
-                        st.error("Invalid Authorization Token")
-        st.stop()
+    if not st.session_state.logged_in:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image("https://cdn-icons-png.flaticon.com/512/2091/2091665.png", width=80)
+            st.title("Market Lens Login")
+            with st.form("Login"):
+                u = st.text_input("Operator ID")
+                p = st.text_input("Access Key", type="password")
+                if st.form_submit_button("INITIALIZE SESSION"):
+                    if u == "admin" and p == "mypass123":
+                        st.session_state.logged_in = True
+                        st.rerun()
+                    else:
+                        st.error("Invalid Authorization Token")
+        st.stop()
 
 check_auth()
 
