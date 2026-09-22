@@ -112,7 +112,7 @@ if page == "📈 Market Terminal":
     
     # Top Row Metrics
     df = get_btc_data(30)
-    current_price = df['close'].iloc[-1]
+    current_price = df['Close'].iloc[-1]
     prev_price = df['close'].iloc[-2]
     pct_change = ((current_price - prev_price) / prev_price) * 100
 
