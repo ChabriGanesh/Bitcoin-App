@@ -233,8 +233,3 @@ elif page == "💬 Quant Assistant":
         except Exception as e:
             st.error(f"Gemini API Error: {e}")
             st.info(f"System attempted to use: {st.session_state.model_name}")
-
-
-
-
-give fully corrected code
