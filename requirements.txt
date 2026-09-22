@@ -4,3 +4,4 @@ numpy
 requests
 google-generativeai
 scikit-learn
+yfinance
