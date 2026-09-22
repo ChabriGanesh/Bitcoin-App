@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import requests
 import google.generativeai as genai
+import yfinance as yf
 from datetime import datetime
 import os
 
@@ -95,34 +96,61 @@ with st.sidebar:
     st.sidebar.caption("System Latency: 24ms")
     st.sidebar.markdown('<p><span class="status-indicator"></span>Network: Secured</p>', unsafe_allow_html=True)
 
-# --- 4. DATA ENGINES ---
+# --- 4. DATA ENGINES (WITH FALLBACK) ---
 @st.cache_data(ttl=300)
 def get_btc_data(limit=100):
-    url = f"https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit={limit}"
+    # Primary Source: yfinance
     try:
-        r = requests.get(url).json()
-        df = pd.DataFrame(r['Data']['Data'])
-        df['time'] = pd.to_datetime(df['time'], unit='s')
-        # Standardize column names to lower case
-        df.columns = df.columns.str.lower()
-        return df.set_index('time')
+        df = yf.download("BTC-USD", period=f"{limit}d", interval="1d")
+        if not df.empty:
+            # Flatten MultiIndex columns if present
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            
+            df.columns = df.columns.str.lower()
+            
+            # Map standard volume column to 'volumeto' for code compatibility
+            if 'volume' in df.columns and 'volumeto' not in df.columns:
+                df['volumeto'] = df['volume']
+            
+            return df
     except Exception:
-        return pd.DataFrame()
+        pass  # Silently fall through to secondary source
+
+    # Secondary Source: CryptoCompare API
+    url = f"https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit={limit}"
+    api_key = st.secrets.get("CRYPTOCOMPARE_KEY", None)
+    headers = {"authorization": f"Apikey {api_key}"} if api_key else {}
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        data = response.json()
+        if 'Data' in data and 'Data' in data['Data']:
+            df = pd.DataFrame(data['Data']['Data'])
+            df['time'] = pd.to_datetime(df['time'], unit='s')
+            df.columns = df.columns.str.lower()
+            return df.set_index('time')
+    except Exception:
+        pass
+
+    return pd.DataFrame()
 
 # --- 5. PAGE: DASHBOARD ---
 if page == "📈 Market Terminal":
     st.title("BTC/USD Real-Time Terminal")
     
-    # Top Row Metrics
     df = get_btc_data(30)
+    
     if not df.empty and 'close' in df.columns:
-        current_price = df['close'].iloc[-1]
-        prev_price = df['close'].iloc[-2]
+        current_price = float(df['close'].iloc[-1])
+        prev_price = float(df['close'].iloc[-2])
         pct_change = ((current_price - prev_price) / prev_price) * 100
 
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("BITCOIN", f"${current_price:,.2f}", f"{pct_change:.2f}%")
-        m2.metric("24H VOLUME", f"{df['volumeto'].iloc[-1]/1e6:.1f}M", "USD")
+        
+        vol_val = df['volumeto'].iloc[-1] if 'volumeto' in df.columns else 0
+        m2.metric("24H VOLUME", f"${vol_val/1e6:.1f}M", "USD")
         m3.metric("RSI (14)", "58.4", "Neutral")
         m4.metric("VOLATILITY", "2.4%", "-0.5%")
 
@@ -133,13 +161,14 @@ if page == "📈 Market Terminal":
         # Lower Data Tabs
         t1, t2 = st.tabs(["📊 Order Flow", "📰 Sentiment"])
         with t1:
-            st.table(df.tail(5)[['high', 'low', 'close', 'volumeto']])
+            display_cols = [col for col in ['high', 'low', 'close', 'volumeto'] if col in df.columns]
+            st.table(df.tail(5)[display_cols])
         with t2:
             st.subheader("Market Psychology")
             
             # 1. Fear & Greed Index
             try:
-                fg_r = requests.get("https://api.alternative.me/fng/").json()
+                fg_r = requests.get("https://api.alternative.me/fng/", timeout=5).json()
                 fg_value = int(fg_r['data'][0]['value'])
                 fg_status = fg_r['data'][0]['value_classification']
                 
@@ -156,7 +185,7 @@ if page == "📈 Market Terminal":
             else:
                 st.warning("Increased selling pressure observed in order books.")
     else:
-        st.error("Unable to load cryptocurrency market data.")
+        st.error("Unable to load cryptocurrency market data. Please refresh or verify API connectivity.")
 
 # --- 6. PAGE: NEURAL FORECAST ---
 elif page == "🤖 Neural Forecast":
