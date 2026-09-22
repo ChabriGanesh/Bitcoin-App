@@ -99,19 +99,44 @@ with st.sidebar:
     st.sidebar.markdown('<p><span class="status-indicator"></span>Network: Secured</p>', unsafe_allow_html=True)
 
 # --- 4. DATA ENGINES ---
+# --- 4. DATA ENGINES ---
 @st.cache_data(ttl=300)
 def get_btc_data(limit=100):
-    url = f"https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit={limit}"
+    # Primary Source: yfinance (Most reliable on Streamlit Cloud)
     try:
-        r = requests.get(url).json()
-        if 'Data' in r and 'Data' in r['Data']:
-            df = pd.DataFrame(r['Data']['Data'])
-            df['time'] = pd.to_datetime(df['time'], unit='s')
-            df.columns = df.columns.str.lower()  # Force lowercase column names
-            return df.set_index('time')
-        return pd.DataFrame()
+        df = yf.download("BTC-USD", period=f"{limit}d", interval="1d")
+        if not df.empty:
+            # Flatten MultiIndex if returned by yfinance
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            
+            df.columns = df.columns.str.lower()
+            
+            # Map 'volume' to 'volumeto' for compatibility
+            if 'volume' in df.columns and 'volumeto' not in df.columns:
+                df['volumeto'] = df['volume']
+            
+            return df
     except Exception:
-        return pd.DataFrame()
+        pass
+
+    # Secondary Source: CryptoCompare API
+    url = f"https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit={limit}"
+    api_key = st.secrets.get("CRYPTOCOMPARE_KEY", None)
+    headers = {"authorization": f"Apikey {api_key}"} if api_key else {}
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        data = response.json()
+        if 'Data' in data and 'Data' in data['Data']:
+            df = pd.DataFrame(data['Data']['Data'])
+            df['time'] = pd.to_datetime(df['time'], unit='s')
+            df.columns = df.columns.str.lower()
+            return df.set_index('time')
+    except Exception:
+        pass
+
+    return pd.DataFrame()
 
 # --- 5. PAGE: DASHBOARD ---
 if page == "📈 Market Terminal":
