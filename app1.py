@@ -119,46 +119,47 @@ if page == "📈 Market Terminal":
     
     # Top Row Metrics
     df = get_btc_data(30)
-    current_price = df['Close'].iloc[-1]
-    prev_price = df['close'].iloc[-2]
-    pct_change = ((current_price - prev_price) / prev_price) * 100
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("BITCOIN", f"${current_price:,.2f}", f"{pct_change:.2f}%")
-    m2.metric("24H VOLUME", f"{df['volumeto'].iloc[-1]/1e6:.1f}M", "USD")
-    m3.metric("RSI (14)", "58.4", "Neutral")
-    m4.metric("VOLATILITY", "2.4%", "-0.5%")
-
-    # Main Chart Area
-    st.subheader("Market Momentum")
-    st.area_chart(df[['close']], color="#00FFAA")
     
-    # Lower Data Tabs
-    t1, t2 = st.tabs(["📊 Order Flow", "📰 Sentiment"])
-    with t1:
-        st.table(df.tail(5)[['high', 'low', 'close', 'volumeto']])
-    with t2:
-        st.subheader("Market Psychology")
+    if not df.empty and 'close' in df.columns:
+        current_price = df['close'].iloc[-1]
+        prev_price = df['close'].iloc[-2]
+        pct_change = ((current_price - prev_price) / prev_price) * 100
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("BITCOIN", f"${current_price:,.2f}", f"{pct_change:.2f}%")
+        m2.metric("24H VOLUME", f"{df['volumeto'].iloc[-1]/1e6:.1f}M", "USD")
+        m3.metric("RSI (14)", "58.4", "Neutral")
+        m4.metric("VOLATILITY", "2.4%", "-0.5%")
+
+        # Main Chart Area
+        st.subheader("Market Momentum")
+        st.area_chart(df[['close']], color="#00FFAA")
         
-        # 1. Fear & Greed Index (Using a popular free API)
-        try:
-            fg_r = requests.get("https://api.alternative.me/fng/").json()
-            fg_value = int(fg_r['data'][0]['value'])
-            fg_status = fg_r['data'][0]['value_classification']
+        # Lower Data Tabs
+        t1, t2 = st.tabs(["📊 Order Flow", "📰 Sentiment"])
+        with t1:
+            st.table(df.tail(5)[['high', 'low', 'close', 'volumeto']])
+        with t2:
+            st.subheader("Market Psychology")
             
-            st.metric("Fear & Greed Index", f"{fg_value}/100", fg_status)
-            st.progress(fg_value / 100) # Visual bar
-        except:
-            st.write("Psychology data temporarily unavailable.")
+            try:
+                fg_r = requests.get("https://api.alternative.me/fng/").json()
+                fg_value = int(fg_r['data'][0]['value'])
+                fg_status = fg_r['data'][0]['value_classification']
+                
+                st.metric("Fear & Greed Index", f"{fg_value}/100", fg_status)
+                st.progress(fg_value / 100)
+            except Exception:
+                st.write("Psychology data temporarily unavailable.")
 
-        # 2. AI Sentiment Analysis
-        st.divider()
-        st.caption("AI News Pulse")
-        if pct_change > 0:
-            st.success("Positive momentum detected in social volume.")
-        else:
-            st.warning("Increased selling pressure observed in order books.")
-
+            st.divider()
+            st.caption("AI News Pulse")
+            if pct_change > 0:
+                st.success("Positive momentum detected in social volume.")
+            else:
+                st.warning("Increased selling pressure observed in order books.")
+    else:
+        st.error("Unable to load cryptocurrency market data. Please refresh or try again shortly.")
 # --- 6. PAGE: NEURAL FORECAST ---
 elif page == "🤖 Neural Forecast":
     st.title("Neural Network Analysis")
