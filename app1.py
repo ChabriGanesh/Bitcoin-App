@@ -4,263 +4,236 @@ import numpy as np
 import requests
 import google.generativeai as genai
 import yfinance as yf
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
 import os
-
-# Configure Gemini API
+# Configure Gemini - Replace with your actual key string
 genai.configure(api_key=st.secrets["GEMINI_KEY"])
-
 # --- 1. CONFIGURATION & STYLING ---
 st.set_page_config(
-    page_title="Bitcoin Trading App", 
-    layout="wide", 
-    page_icon="💎",
-    initial_sidebar_state="expanded"
+    page_title="Bitcoin Trading App", 
+    layout="wide", 
+    page_icon="💎",
+    initial_sidebar_state="expanded"
 )
 
 # Professional Dark Theme CSS
 st.markdown("""
-    <style>
-    /* Main Background */
-    .stApp {
-        background-color: #0E1117;
-        color: #E0E0E0;
-    }
-    
-    /* Custom Card Design */
-    div[data-testid="metric-container"] {
-        background-color: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }
-    
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: #161B22;
-        border-right: 1px solid #30363D;
-    }
-    
-    /* Glowing Status Indicator */
-    .status-indicator {
-        height: 10px;
-        width: 10px;
-        background-color: #00FF41;
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 8px;
-        box-shadow: 0 0 8px #00FF41;
-        animation: blink 2s infinite;
-    }
-    
-    @keyframes blink {
-        0% { opacity: 1; }
-        50% { opacity: 0.3; }
-        100% { opacity: 1; }
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    <style>
+    /* Main Background */
+    .stApp {
+        background-color: #0E1117;
+        color: #E0E0E0;
+    }
+    
+    /* Custom Card Design */
+    div[data-testid="metric-container"] {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #161B22;
+        border-right: 1px solid #30363D;
+    }
+    
+    /* Glowing Status Indicator */
+    .status-indicator {
+        height: 10px;
+        width: 10px;
+        background-color: #00FF41;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+        box-shadow: 0 0 8px #00FF41;
+        animation: blink 2s infinite;
+    }
+    
+    @keyframes blink {
+        0% { opacity: 1; }
+        50% { opacity: 0.3; }
+        100% { opacity: 1; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- 2. AUTHENTICATION ---
+# --- 2. AUTHENTICATION (REFINED) ---
 def check_auth():
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
 
-    if not st.session_state.logged_in:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.image("https://cdn-icons-png.flaticon.com/512/2091/2091665.png", width=80)
-            st.title("Market Lens Login")
-            with st.form("Login"):
-                u = st.text_input("Operator ID")
-                p = st.text_input("Access Key", type="password")
-                if st.form_submit_button("INITIALIZE SESSION"):
-                    if u == "admin" and p == "mypass123":
-                        st.session_state.logged_in = True
-                        st.rerun()
-                    else:
-                        st.error("Invalid Authorization Token")
-        st.stop()
+    if not st.session_state.logged_in:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image("https://cdn-icons-png.flaticon.com/512/2091/2091665.png", width=80)
+            st.title("Market Lens Login")
+            with st.form("Login"):
+                u = st.text_input("Operator ID")
+                p = st.text_input("Access Key", type="password")
+                if st.form_submit_button("INITIALIZE SESSION"):
+                    if u == "admin" and p == "mypass123":
+                        st.session_state.logged_in = True
+                        st.rerun()
+                    else:
+                        st.error("Invalid Authorization Token")
+        st.stop()
 
 check_auth()
 
 # --- 3. SIDEBAR & TOOLS ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2533/2533030.png", width=50)
-    st.title("ALPHA v2.0")
-    st.divider()
-    page = st.selectbox("MODULE", ["📈 Market Terminal", "🤖 Neural Forecast", "💬 Quant Assistant"])
-    
-    st.sidebar.markdown("---")
-    st.sidebar.caption("System Latency: 24ms")
-    st.sidebar.markdown('<p><span class="status-indicator"></span>Network: Secured</p>', unsafe_allow_html=True)
+    st.image("https://cdn-icons-png.flaticon.com/512/2533/2533030.png", width=50)
+    st.title("ALPHA v2.0")
+    st.divider()
+    page = st.selectbox("MODULE", ["📈 Market Terminal", "🤖 Neural Forecast", "💬 Quant Assistant"])
+    
+    st.sidebar.markdown("---")
+    st.sidebar.caption("System Latency: 24ms")
+    st.sidebar.markdown('<p><span class="status-indicator"></span>Network: Secured</p>', unsafe_allow_html=True)
 
-# --- 4. DATA ENGINES (WITH FALLBACK) ---
+# --- 4. DATA ENGINES ---
 @st.cache_data(ttl=300)
 def get_btc_data(limit=100):
-    # Primary Source: yfinance
-    try:
-        df = yf.download("BTC-USD", period=f"{limit}d", interval="1d")
-        if not df.empty:
-            # Flatten MultiIndex columns if present
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-            
-            df.columns = df.columns.str.lower()
-            
-            # Map standard volume column to 'volumeto' for code compatibility
-            if 'volume' in df.columns and 'volumeto' not in df.columns:
-                df['volumeto'] = df['volume']
-            
-            return df
-    except Exception:
-        pass  # Silently fall through to secondary source
-
-    # Secondary Source: CryptoCompare API
-    url = f"https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit={limit}"
-    api_key = st.secrets.get("CRYPTOCOMPARE_KEY", None)
-    headers = {"authorization": f"Apikey {api_key}"} if api_key else {}
-
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        data = response.json()
-        if 'Data' in data and 'Data' in data['Data']:
-            df = pd.DataFrame(data['Data']['Data'])
-            df['time'] = pd.to_datetime(df['time'], unit='s')
-            df.columns = df.columns.str.lower()
-            return df.set_index('time')
-    except Exception:
-        pass
-
-    return pd.DataFrame()
+    url = f"https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit={limit}"
+    try:
+        r = requests.get(url).json()
+        df = pd.DataFrame(r['Data']['Data'])
+        df['time'] = pd.to_datetime(df['time'], unit='s')
+        return df.set_index('time')
+    except: return pd.DataFrame()
 
 # --- 5. PAGE: DASHBOARD ---
 if page == "📈 Market Terminal":
-    st.title("BTC/USD Real-Time Terminal")
-    
-    df = get_btc_data(30)
-    
-    if not df.empty and 'close' in df.columns:
-        current_price = float(df['close'].iloc[-1])
-        prev_price = float(df['close'].iloc[-2])
-        pct_change = ((current_price - prev_price) / prev_price) * 100
+    st.title("BTC/USD Real-Time Terminal")
+    
+    # Top Row Metrics
+    df = get_btc_data(30)
+    current_price = df['Close'].iloc[-1]
+    prev_price = df['close'].iloc[-2]
+    pct_change = ((current_price - prev_price) / prev_price) * 100
 
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("BITCOIN", f"${current_price:,.2f}", f"{pct_change:.2f}%")
-        
-        vol_val = df['volumeto'].iloc[-1] if 'volumeto' in df.columns else 0
-        m2.metric("24H VOLUME", f"${vol_val/1e6:.1f}M", "USD")
-        m3.metric("RSI (14)", "58.4", "Neutral")
-        m4.metric("VOLATILITY", "2.4%", "-0.5%")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("BITCOIN", f"${current_price:,.2f}", f"{pct_change:.2f}%")
+    m2.metric("24H VOLUME", f"{df['volumeto'].iloc[-1]/1e6:.1f}M", "USD")
+    m3.metric("RSI (14)", "58.4", "Neutral")
+    m4.metric("VOLATILITY", "2.4%", "-0.5%")
 
-        # Main Chart Area
-        st.subheader("Market Momentum")
-        st.area_chart(df[['close']], color="#00FFAA")
-        
-        # Lower Data Tabs
-        t1, t2 = st.tabs(["📊 Order Flow", "📰 Sentiment"])
-        with t1:
-            display_cols = [col for col in ['high', 'low', 'close', 'volumeto'] if col in df.columns]
-            st.table(df.tail(5)[display_cols])
-        with t2:
-            st.subheader("Market Psychology")
-            
-            # 1. Fear & Greed Index
-            try:
-                fg_r = requests.get("https://api.alternative.me/fng/", timeout=5).json()
-                fg_value = int(fg_r['data'][0]['value'])
-                fg_status = fg_r['data'][0]['value_classification']
-                
-                st.metric("Fear & Greed Index", f"{fg_value}/100", fg_status)
-                st.progress(fg_value / 100)
-            except Exception:
-                st.write("Psychology data temporarily unavailable.")
+    # Main Chart Area
+    st.subheader("Market Momentum")
+    st.area_chart(df[['close']], color="#00FFAA")
+    
+    # Lower Data Tabs
+    t1, t2 = st.tabs(["📊 Order Flow", "📰 Sentiment"])
+    with t1:
+        st.table(df.tail(5)[['high', 'low', 'close', 'volumeto']])
+    with t2:
+        st.subheader("Market Psychology")
+        
+        # 1. Fear & Greed Index (Using a popular free API)
+        try:
+            fg_r = requests.get("https://api.alternative.me/fng/").json()
+            fg_value = int(fg_r['data'][0]['value'])
+            fg_status = fg_r['data'][0]['value_classification']
+            
+            st.metric("Fear & Greed Index", f"{fg_value}/100", fg_status)
+            st.progress(fg_value / 100) # Visual bar
+        except:
+            st.write("Psychology data temporarily unavailable.")
 
-            # 2. AI Sentiment Analysis
-            st.divider()
-            st.caption("AI News Pulse")
-            if pct_change > 0:
-                st.success("Positive momentum detected in social volume.")
-            else:
-                st.warning("Increased selling pressure observed in order books.")
-    else:
-        st.error("Unable to load cryptocurrency market data. Please refresh or verify API connectivity.")
+        # 2. AI Sentiment Analysis
+        st.divider()
+        st.caption("AI News Pulse")
+        if pct_change > 0:
+            st.success("Positive momentum detected in social volume.")
+        else:
+            st.warning("Increased selling pressure observed in order books.")
 
 # --- 6. PAGE: NEURAL FORECAST ---
 elif page == "🤖 Neural Forecast":
-    st.title("Neural Network Analysis")
-    st.subheader("Where Markets Meet Predictions")
-    col_l, col_r = st.columns([1, 2])
-    
-    with col_l:
-        st.info("Model: LSTM-v4\n\nInputs: OHLCV, 60-Day Window")
-        if st.button("RUN INFERENCE", use_container_width=True):
-            with st.status("Computing weights..."):
-                st.write("Fetching historical window...")
-                st.write("Normalizing tensors...")
-                st.write("Running forward pass...")
-            
-            st.success("Analysis Complete")
-            st.metric("Neural Target", "$68,432", "+2.4%")
+    st.title("Neural Network Analysis")
+    st.subheader("Where Markets Meet Predictions")
+    col_l, col_r = st.columns([1, 2])
+    
+    with col_l:
+        st.info("Model: LSTM-v4\n\nInputs: OHLCV, 60-Day Window")
+        if st.button("RUN INFERENCE", use_container_width=True):
+            with st.status("Computing weights..."):
+                # Simulation of logic since model file might be missing
+                st.write("Fetching historical window...")
+                st.write("Normalizing tensors...")
+                st.write("Running forward pass...")
+            
+            # Logic here... (same as your original, but prettier output)
+            st.success("Analysis Complete")
+            st.metric("Neural Target", "$68,432", "+2.4%")
 
-    with col_r:
-        st.caption("Historical Accuracy vs Prediction")
-        chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
-        st.line_chart(chart_data)
-        
-# --- 7. PAGE: QUANT ASSISTANT ---
+    with col_r:
+        st.caption("Historical Accuracy vs Prediction")
+        chart_data = pd.DataFrame(np.random.randn(20, 2), columns=['Actual', 'Neural'])
+        st.line_chart(chart_data)
+        
+# --- 7. PAGE: QUANT ASSISTANT (STABLE & AUTO-DETECT) ---
 elif page == "💬 Quant Assistant":
-    st.title("💬 Gemini Quant Intelligence")
+    st.title("💬 Gemini Quant Intelligence")
 
-    # 1. Setup Model Auto-Detection
-    if "model_name" not in st.session_state:
-        try:
-            available_models = [m.name for m in genai.list_models() 
-                              if 'generateContent' in m.supported_generation_methods]
-            
-            if 'models/gemini-1.5-flash' in available_models:
-                st.session_state.model_name = "models/gemini-1.5-flash"
-            elif 'models/gemini-2.5-flash' in available_models:
-                st.session_state.model_name = "models/gemini-2.5-flash"
-            elif 'models/gemini-pro' in available_models:
-                st.session_state.model_name = "models/gemini-pro"
-            elif available_models:
-                st.session_state.model_name = available_models[0]
-            else:
-                st.session_state.model_name = "gemini-1.5-flash"
-        except Exception:
-            st.session_state.model_name = "gemini-1.5-flash"
+    # 1. Setup the Model with Auto-Detection
+    if "model_name" not in st.session_state:
+        try:
+            # We look for the first available flash model to avoid 404s
+            available_models = [m.name for m in genai.list_models() 
+                              if 'generateContent' in m.supported_generation_methods]
+            
+            # Priority: 1.5-flash -> 1.5-flash-latest -> gemini-pro
+            if 'models/gemini-1.5-flash' in available_models:
+                st.session_state.model_name = "models/gemini-2.5-flash"
+            elif 'models/gemini-pro' in available_models:
+                st.session_state.model_name = "models/gemini-pro"
+            else:
+                st.session_state.model_name = available_models[0] # Use whatever is first
+        except Exception:
+            # Fallback if listing fails
+            st.session_state.model_name = "models/gemini-2.5-flash"
 
-    # Initialize Model Instance
-    model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
+    # Initialize the actual model object
+    model_gemini = genai.GenerativeModel(model_name=st.session_state.model_name)
 
-    # 2. Initialize Chat Session
-    if "chat_session" not in st.session_state:
-        st.session_state.chat_session = model_gemini.start_chat(history=[])
+    # 2. Initialize Chat Session (Mapping to your JS model.startChat)
+    if "chat_session" not in st.session_state:
+        st.session_state.chat_session = model_gemini.start_chat(history=[])
 
-    # 3. Display History
-    chat_container = st.container()
-    
-    with chat_container:
-        for message in st.session_state.chat_session.history:
-            role = "user" if message.role == "user" else "assistant"
-            with st.chat_message(role):
-                if message.parts:
-                    st.markdown(message.parts[0].text)
+    # 3. Display History (Safe Loop)
+    chat_container = st.container()
+    
+    with chat_container:
+        for message in st.session_state.chat_session.history:
+            role = "user" if message.role == "user" else "assistant"
+            with st.chat_message(role):
+                if message.parts:
+                    st.markdown(message.parts[0].text)
 
-    # 4. Input Area
-    if prompt := st.chat_input("Analyze market volatility..."):
-        with chat_container:
-            with st.chat_message("user"):
-                st.markdown(prompt)
-        
-        # 5. Send Prompt & Retrieve Response
-        try:
-            response = st.session_state.chat_session.send_message(prompt)
-            with chat_container:
-                with st.chat_message("assistant"):
-                    st.markdown(response.text)
-        except Exception as e:
-            st.error(f"Gemini API Error: {e}")
-            st.info(f"System attempted to use: {st.session_state.model_name}")
+    # 4. Input Area (Mapping to your JS readlineSync)
+    if prompt := st.chat_input("Analyze market volatility..."):
+        # Display the user's message immediately
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
+        
+        # 5. Get AI Response (Mapping to your JS chat.sendMessage)
+        try:
+            response = st.session_state.chat_session.send_message(prompt)
+            with chat_container:
+                with st.chat_message("assistant"):
+                    st.markdown(response.text)
+        except Exception as e:
+            st.error(f"Gemini API Error: {e}")
+            st.info(f"System attempted to use: {st.session_state.model_name}")
+
+
+
+
+give fully corrected code
